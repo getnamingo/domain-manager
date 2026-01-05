@@ -598,6 +598,7 @@ function getProviderDisplayName(string $provider): string {
     $providerNames = [
         'ANYCASTDNS'  => 'AnycastDNS',
         'BIND9'       => 'Bind',
+        'BUNNY'       => 'Bunny',
         'CLOUDFLARE'  => 'Cloudflare',
         'CLOUDNS'     => 'ClouDNS',
         'DESEC'       => 'Desec',

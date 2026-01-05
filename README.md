@@ -22,6 +22,7 @@ Namingo Domain Manager supports the following **DNS providers**, each requiring 
 |------------|---------------------|------------|---------------------|
 | **AnycastDNS** | `API_KEY` | ✅ | ❌ |
 | **Bind9** | `API_KEY:BIND_IP` | ✅ | 🚧 |
+| **Bunny** | `API_KEY` | | ✅ | ✅ |
 | **Cloudflare** | `EMAIL:API_KEY` or `API_TOKEN` | ✅ | ❌ |
 | **ClouDNS** | `AUTH_ID:AUTH_PASSWORD` | ✅ | ✅ |
 | **Desec** | `API_KEY` | ✅ | ✅ |
