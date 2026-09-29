@@ -690,9 +690,18 @@ class ZonesController extends Controller
             $service = new CardoService($pdo);
             $dnssec = $this->dnssecState($service, $config);
             $nameservers = $this->nameserversForZone($domain, $config);
+            $canDeleteZone = ($config['provider'] ?? '') !== 'GandiLiveDNS';
+            if (($config['provider'] ?? '') === 'Scaleway') {
+                $parent = strtolower(rtrim((string)($config['parent_domain'] ?? ''), '.'));
+                $zoneName = strtolower(rtrim((string)$domain['domain_name'], '.'));
+                $canDeleteZone = $parent !== ''
+                    && $zoneName !== $parent
+                    && str_ends_with($zoneName, '.' . $parent);
+            }
         } catch (\Throwable $e) {
             $dnssec = ['supported' => false, 'enabled' => false, 'can_enable' => false, 'can_disable' => false, 'ds' => []];
             $nameservers = getConfiguredNameservers();
+            $canDeleteZone = false;
             $this->container->get('flash')->addMessage('error', 'Could not load provider status: ' . $e->getMessage());
         }
 
@@ -727,6 +736,7 @@ class ZonesController extends Controller
             'dnssec' => $dnssec,
             'dsList' => $this->displayDsRecords($dnssec['ds'] ?? []),
             'nameservers' => $nameservers,
+            'canDeleteZone' => $canDeleteZone,
         ]);
     }
 
