@@ -19,12 +19,12 @@
         "orm",
         "argora"
     ],
-    "homepage": "https://github.com/getargora/foundry",
+    "homepage": "https://github.com/getnamingo/domain-manager",
     "license": "MIT",
     "authors": [
         {
-            "name": "Taras Kondratyuk",
-            "email": "help@argora.org"
+            "name": "Terbora Ltd",
+            "email": "hello@terbora.com"
         }
     ],
     "require": {
@@ -62,7 +62,7 @@
         "adyen/php-api-library": "^30.0",
         "argora/tabler-assets": "^1.4",
         "liqpay/liqpay": "^1.4",
-        "namingo/plexdns": "^1.1.0",
+        "namingo/plexdns": "^1.1.1",
         "pear/net_dns2": "^2.0",
         "utopia-php/dns": "^1.3.0"
     },
@@ -83,8 +83,8 @@
       ]
     },
     "support": {
-        "issues": "https://github.com/getargora/foundry/issues",
-        "source": "https://github.com/getargora/foundry"
+        "issues": "https://github.com/getnamingo/domain-manager/issues",
+        "source": "https://github.com/getnamingo/domain-manager"
     },
     "config": {
         "allow-plugins": {
