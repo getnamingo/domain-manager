@@ -113,6 +113,9 @@ composer_update() {
 # Update composer in relevant directories
 composer_update "$ndm_path"
 
+echo "Running database migrations..."
+php "$ndm_path/bin/upgrade-db.php"
+
 wget "http://www.adminer.org/latest.php" -O /usr/share/adminer/latest.php
 
 apt-get install -y php8.3-opentelemetry
