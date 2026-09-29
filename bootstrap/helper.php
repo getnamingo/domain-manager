@@ -628,13 +628,26 @@ function getProviderCredentials(string $provider): ?array
     return $credentials !== [] ? $credentials : null;
 }
 
+function hasRequiredDnsProviderCredentials(string $provider, ?array $credentials): bool
+{
+    if ($credentials === null) {
+        return false;
+    }
+
+    return match ($provider) {
+        'ClouDNS' => !empty($credentials['AUTH_ID']) && !empty($credentials['AUTH_PASSWORD']),
+        'Scaleway' => !empty($credentials['API_KEY']) && !empty($credentials['PROJECT_ID']),
+        default => !empty($credentials['API_KEY']),
+    };
+}
+
 function getActiveProviders(): array
 {
     $activeProviders = [];
 
     foreach (dnsProviderMap() as $key => $display) {
         $credentials = getProviderCredentials($key);
-        if ($credentials !== null) {
+        if (hasRequiredDnsProviderCredentials($display, $credentials)) {
             $activeProviders[$key] = $display === 'GandiLiveDNS' ? 'Gandi LiveDNS' : $display;
         }
     }
