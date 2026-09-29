@@ -1,3 +1,6 @@
+<form id="zone-delete-form" method="post" class="d-none">
+    {{ csrf.field | raw }}
+</form>
 <script src="/assets/modules/js/tabulator.min.js" defer></script>
 <script src="/assets/modules/js/sweetalert2.min.js" defer></script>
 <script src="/assets/js/tabler.min.js" defer></script>
@@ -108,7 +111,9 @@
                     }).then((result) => {
                       if (result.isConfirmed) {
                         let deleteUrl = e.target.closest('.delete-btn').getAttribute('data-delete-url');
-                        window.location.href = deleteUrl;
+                        const deleteForm = document.getElementById('zone-delete-form');
+                        deleteForm.action = deleteUrl;
+                        deleteForm.submit();
                       }
                     });
                 }
