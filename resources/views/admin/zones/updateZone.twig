@@ -26,30 +26,6 @@
                   {{ __('Updating Zone') }} {{ domain.domain_name }}
                 </h2>
               </div>
-              {% if domain.dnssec_status %}
-              <!-- Page title actions -->
-              <div class="col-auto ms-auto d-print-none">
-                <div class="btn-list">
-                  {% if domain.dnssec_status == 1 %}
-                  <a href="/zone/dnssec/{{ domain.domain_name_o }}" class="btn btn-outline-primary d-none d-sm-inline-block">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10 10m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0" /><path d="M21 21l-6 -6" /></svg>
-                    {{ __('Enable DNSSEC') }}
-                  </a>
-                  <a href="/zone/dnssec/{{ domain.domain_name_o }}" class="btn btn-outline-primary d-sm-none btn-icon" aria-label="{{ __('Enable DNSSEC') }}" title="{{ __('Enable DNSSEC') }}">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10 10m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0" /><path d="M21 21l-6 -6" /></svg>
-                  </a>
-                  {% elseif domain.dnssec_status == 2 %}
-                  <a href="#" class="btn btn-outline-danger d-none d-sm-inline-block disabled">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M7 7h-1a2 2 0 0 0 -2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2 -2v-1" /><path d="M20.385 6.585a2.1 2.1 0 0 0 -2.97 -2.97l-8.415 8.385v3h3l8.385 -8.415z" /><path d="M16 5l3 3" /></svg>
-                    {{ __('Disable DNSSEC') }}
-                  </a>
-                  <a href="#" class="btn btn-outline-danger d-sm-none btn-icon disabled" aria-label="{{ __('Disable DNSSEC') }}" title="{{ __('Disable DNSSEC') }}">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M7 7h-1a2 2 0 0 0 -2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2 -2v-1" /><path d="M20.385 6.585a2.1 2.1 0 0 0 -2.97 -2.97l-8.415 8.385v3h3l8.385 -8.415z" /><path d="M16 5l3 3" /></svg>
-                  </a>
-                  {% endif %}
-                </div>
-              </div>
-              {% endif %}
             </div>
           </div>
         </div>
@@ -97,17 +73,25 @@
                                     <option value="MX">MX</option>
                                     <option value="TXT">TXT</option>
                                     <option value="SPF">SPF</option>
+                                    <option value="SRV">SRV</option>
+                                    <option value="CAA">CAA</option>
+                                    <option value="PTR">PTR</option>
+                                    <option value="TLSA">TLSA</option>
+                                    <option value="SSHFP">SSHFP</option>
+                                    <option value="NAPTR">NAPTR</option>
+                                    <option value="HTTPS">HTTPS</option>
+                                    <option value="SVCB">SVCB</option>
                                     <option value="DS">DS</option>
                                 </select>
                             </div>
                             <div class="col-md-2">
-                                <input type="text" class="form-control" placeholder="example." name="record_name">
+                                <input type="text" class="form-control" placeholder="www, _sip._tcp, or @" name="record_name">
                             </div>
                             <div class="col-md-3">
-                                <input type="text" class="form-control" placeholder="127.0.0.1" name="record_value" required>
+                                <input type="text" class="form-control" placeholder="Value / RDATA" name="record_value" required>
                             </div>
                             <div class="col-sm">
-                                <input type="number" class="form-control" placeholder="TTL" name="record_ttl" value="600" required>
+                                <input type="number" class="form-control" placeholder="TTL" name="record_ttl" value="3600" required>
                             </div>
                             <div class="col-sm">
                                 <input type="number" class="form-control" placeholder="Priority" name="record_priority">
@@ -115,6 +99,9 @@
                             <div class="col-md-auto">
                                 <button class="btn btn-outline-primary btn-icon" type="submit" title="Add Record"><svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14" /><path d="M5 12l14 0" /></svg></button>
                             </div>
+                        </div>
+                        <div class="form-hint mt-2">
+                          {{ __('For SRV use “weight port target” in Value and Priority in the Priority field. For CAA use complete RDATA such as “0 issue letsencrypt.org”.') }}
                         </div>
                     </form>
                   </div>
@@ -138,9 +125,9 @@
                             <tbody id="recordsTableBody">
                                 {% for record in records %}
                                     <tr>
-                                    <form id="record-form-{{ record.recordId }}" class="mb-4 api-form" method="post" action="/zone/updaterecord">
+                                    <form id="record-form-{{ record.id }}" class="mb-4 api-form" method="post" action="/zone/updaterecord">
                                     {{ csrf.field | raw }}
-                                        <input type="hidden" name="record_id" value="{{ record.recordId }}"/>
+                                        <input type="hidden" name="record_id" value="{{ record.id }}"/>
                                         <input type="hidden" name="record_type" value="{{ record.type }}"/>
                                         <input type="hidden" name="record_name" value="{{ record.host }}"/>
                                         <td>
@@ -152,6 +139,8 @@
                                             {% elseif dns_type == 'MX' %}bg-orange-lt
                                             {% elseif dns_type == 'TXT' %}bg-teal-lt
                                             {% elseif dns_type == 'SPF' %}bg-red-lt
+                                            {% elseif dns_type == 'SRV' %}bg-cyan-lt
+                                            {% elseif dns_type == 'CAA' %}bg-yellow-lt
                                             {% elseif dns_type == 'DS' %}bg-purple-lt
                                             {% else %}bg-default
                                             {% endif %}">{{ dns_type }}</span>
@@ -164,7 +153,7 @@
                                             <button type="submit" class="btn btn-outline-primary btn-icon" name="action" value="update" title="Update Record">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M7 7h-1a2 2 0 0 0 -2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2 -2v-1" /><path d="M20.385 6.585a2.1 2.1 0 0 0 -2.97 -2.97l-8.415 8.385v3h3l8.385 -8.415z" /><path d="M16 5l3 3" /></svg>
                                             </button>
-                                            <button type="button" class="btn btn-outline-danger btn-icon" value="delete" title="Delete Record" onclick="confirmDelete('record-form-{{ record.recordId }}')">
+                                            <button type="button" class="btn btn-outline-danger btn-icon" value="delete" title="Delete Record" onclick="confirmDelete('record-form-{{ record.id }}')">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" 
                                                     viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" 
                                                     stroke-linecap="round" stroke-linejoin="round">
@@ -185,37 +174,91 @@
                         </table>
                     </div>
               </div>
-            {% if dsList is not empty %}
-                <div class="card mb-3">
-                    <div class="card-header">
-                        <h3 class="card-title">DS Records</h3>
-                    </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-vcenter card-table table-striped">
-                                <thead>
-                                    <tr>
-                                        <th>Key Tag</th>
-                                        <th>Algo</th>
-                                        <th>Digest Type</th>
-                                        <th>Digest</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for ds in dsList %}
-                                    <tr>
-                                        <td>{{ ds.keytag }}</td>
-                                        <td>{{ ds.algorithm }}</td>
-                                        <td>{{ ds.digest_type }}</td>
-                                        <td><code class="user-select-all">{{ ds.digest }}</code></td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+            <div class="row g-3 mt-1">
+              <div class="col-12 col-lg-6">
+                <div class="card h-100">
+                  <div class="card-header"><h3 class="card-title">{{ __('Nameservers') }}</h3></div>
+                  <div class="card-body">
+                    <p class="text-secondary">{{ __('Set these nameservers at your registrar:') }}</p>
+                    {% for nameserver in nameservers %}
+                      <div class="mb-2"><code class="user-select-all">{{ nameserver }}</code></div>
+                    {% else %}
+                      <span class="text-secondary">{{ __('No nameservers are configured for this zone.') }}</span>
+                    {% endfor %}
+                  </div>
                 </div>
-            {% endif %}
+              </div>
+
+              <div class="col-12 col-lg-6">
+                <div class="card h-100">
+                  <div class="card-header d-flex align-items-center justify-content-between">
+                    <h3 class="card-title mb-0">{{ __('DNSSEC') }}</h3>
+                    {% if dnssec.supported %}
+                      <span class="badge {{ dnssec.enabled ? 'bg-green-lt' : 'bg-red-lt' }}">
+                        {{ dnssec.enabled ? __('Enabled') : __('Disabled') }}
+                      </span>
+                    {% else %}
+                      <span class="badge bg-secondary-lt">{{ __('Not supported') }}</span>
+                    {% endif %}
+                  </div>
+                  <div class="card-body">
+                    {% if dnssec.supported %}
+                      {% if dnssec.enforced %}
+                        <p class="text-secondary">{{ __('DNSSEC is automatically managed by this provider.') }}</p>
+                      {% endif %}
+
+                      {% if dsList is not empty %}
+                        <p class="text-secondary mb-2">{{ __('Publish these DS records at your registrar:') }}</p>
+                        {% for ds in dsList %}
+                          <div class="mb-2">
+                            <code class="user-select-all text-break">{{ ds.full }}</code>
+                          </div>
+                        {% endfor %}
+                      {% endif %}
+
+                      <div class="mt-3 d-flex gap-2">
+                        {% if not dnssec.enabled and dnssec.can_enable %}
+                          <form method="post" action="/zone/dnssec/{{ domain.domain_name_o }}">
+                            {{ csrf.field | raw }}
+                            <input type="hidden" name="action" value="enable">
+                            <button type="submit" class="btn btn-outline-success">{{ __('Enable DNSSEC') }}</button>
+                          </form>
+                        {% endif %}
+                        {% if dnssec.enabled and dnssec.can_disable %}
+                          <form method="post" action="/zone/dnssec/{{ domain.domain_name_o }}" onsubmit="return confirm('{{ __('Remove the DS record from your registrar before disabling DNSSEC, otherwise the domain may stop resolving. Continue?')|e('js') }}');">
+                            {{ csrf.field | raw }}
+                            <input type="hidden" name="action" value="disable">
+                            <button type="submit" class="btn btn-outline-danger">{{ __('Disable DNSSEC') }}</button>
+                          </form>
+                        {% endif %}
+                      </div>
+                    {% else %}
+                      <p class="text-secondary mb-0">{{ __('This provider does not expose DNSSEC management through Cardo DNS.') }}</p>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-12">
+                <div class="card border-danger">
+                  <div class="card-header"><h3 class="card-title text-danger">{{ __('Zone actions') }}</h3></div>
+                  <div class="card-body d-flex align-items-center justify-content-between gap-3 flex-wrap">
+                    <div>
+                      <div class="fw-semibold">{{ __('Delete this DNS zone') }}</div>
+                      <div class="text-secondary">{{ __('Remote deletion must succeed before the local zone is removed.') }}</div>
+                    </div>
+                    {% if canDeleteZone %}
+                      <form method="post" action="/zone/delete/{{ domain.domain_name_o }}" onsubmit="return confirm('{{ __('Delete this DNS zone permanently?')|e('js') }}');">
+                        {{ csrf.field | raw }}
+                        <button type="submit" class="btn btn-danger">{{ __('Delete Zone') }}</button>
+                      </form>
+                    {% else %}
+                      <span class="text-secondary">{{ __('Zone deletion is unavailable for this provider or managed root zone.') }}</span>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+            </div>
             </div>
           </div>
         </div>

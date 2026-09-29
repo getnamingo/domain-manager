@@ -37,6 +37,7 @@ tar -czf "$backup_dir/ndm_backup_${backup_ts}.tar.gz" \
 
 # Database credentials from .env in NDM path
 env_file="$ndm_path/.env"
+db_driver=$(grep -E '^DB_DRIVER=' "$env_file" | cut -d '=' -f2-)
 db_host=$(grep -E '^DB_HOST=' "$env_file" | cut -d '=' -f2-)
 db_name=$(grep -E '^DB_DATABASE=' "$env_file" | cut -d '=' -f2-)
 db_user=$(grep -E '^DB_USERNAME=' "$env_file" | cut -d '=' -f2-)
@@ -47,16 +48,32 @@ databases=("$db_name")
 
 # Backup specific databases
 for db_name in "${databases[@]}"; do
-    echo "Backing up database $db_name..."
-    sql_backup_file="$backup_dir/db_${db_name}_backup_$(date +%F).sql"
-    mariadb-dump -u"$db_user" -p"$db_pass" -h"$db_host" "$db_name" > "$sql_backup_file"
-    
-    # Compress the SQL backup file
-    echo "Compressing database backup $db_name..."
-    tar -czf "${sql_backup_file}.tar.gz" -C "$backup_dir" "$(basename "$sql_backup_file")"
-    
-    # Remove the uncompressed SQL file
-    rm "$sql_backup_file"
+    echo "Backing up database $db_name (driver: $db_driver)..."
+
+    case "$db_driver" in
+        mysql|mariadb|"")
+            sql_backup_file="$backup_dir/db_${db_name}_backup_$(date +%F).sql"
+            mariadb-dump -u"$db_user" -p"$db_pass" -h"$db_host" "$db_name" > "$sql_backup_file"
+            tar -czf "${sql_backup_file}.tar.gz" -C "$backup_dir" "$(basename "$sql_backup_file")"
+            rm "$sql_backup_file"
+            ;;
+        pgsql)
+            sql_backup_file="$backup_dir/db_${db_name}_backup_$(date +%F).sql"
+            PGPASSWORD="$db_pass" pg_dump -h "$db_host" -U "$db_user" -d "$db_name" > "$sql_backup_file"
+            tar -czf "${sql_backup_file}.tar.gz" -C "$backup_dir" "$(basename "$sql_backup_file")"
+            rm "$sql_backup_file"
+            ;;
+        sqlite)
+            sqlite_copy="$backup_dir/db_sqlite_backup_$(date +%F).sqlite"
+            cp -a "$db_name" "$sqlite_copy"
+            tar -czf "${sqlite_copy}.tar.gz" -C "$backup_dir" "$(basename "$sqlite_copy")"
+            rm "$sqlite_copy"
+            ;;
+        *)
+            echo "ERROR: Unsupported DB_DRIVER='$db_driver' (supported: mysql, mariadb, pgsql, sqlite)"
+            exit 1
+            ;;
+    esac
 done
 
 # Stop services
@@ -112,6 +129,9 @@ composer_update() {
 
 # Update composer in relevant directories
 composer_update "$ndm_path"
+
+echo "Running database migrations..."
+php "$ndm_path/bin/upgrade-db.php"
 
 wget "http://www.adminer.org/latest.php" -O /usr/share/adminer/latest.php
 

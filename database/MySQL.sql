@@ -81,26 +81,28 @@ CREATE TABLE IF NOT EXISTS `users_throttling` (
 CREATE TABLE IF NOT EXISTS `users_webauthn` (
     `id` INT AUTO_INCREMENT PRIMARY KEY,
     `user_id` INT UNSIGNED NOT NULL,
-    `credential_id` VARBINARY(255) NOT NULL,
+    `credential_id` VARBINARY(1364) NOT NULL,
     `public_key` TEXT NOT NULL,
     `attestation_object` BLOB,
     `sign_count` BIGINT NOT NULL,
     `user_agent` VARCHAR(512),
     `created_at` DATETIME(3) DEFAULT CURRENT_TIMESTAMP,
     `last_used_at` DATETIME(3) DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY `credential_id` (`credential_id`),
     FOREIGN KEY (user_id) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `zones` (
     `id` BIGINT(20) NOT NULL AUTO_INCREMENT,
     `client_id` BIGINT(20) NOT NULL,
-    `domain_name` VARCHAR(75),
+    `domain_name` VARCHAR(253) NOT NULL,
     `provider_id` VARCHAR(11),
     `zoneId` VARCHAR(100) DEFAULT NULL,
     `config` TEXT NOT NULL,
     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
     `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (`id`)
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uniq_zone_domain_name` (`domain_name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
                 
 CREATE TABLE IF NOT EXISTS `records` (

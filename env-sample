@@ -1,6 +1,10 @@
 APP_NAME='NDM'
 APP_ENV=public
-APP_URL=http://localhost
+APP_URL=https://localhost
+APP_DOMAIN=localhost
+
+WEB_AUTHN_ENABLED=false
+WEBAUTHN_DUMMY_SECRET=change-this-to-a-random-secret-of-at-least-32-characters
 
 LANG=en_US
 UI_LANG=us
@@ -15,6 +19,8 @@ DB_PORT=3306
 DNS_RESOLVER=1.1.1.1
 
 #mailer settings (Driver = smtp, utopia or msg [for local message broker]; Api Provder = sendgrid or mailgun)
+# generate with: php -r 'echo bin2hex(random_bytes(32)), PHP_EOL;'
+MSG_API_TOKEN=
 
 MAIL_DRIVER=none
 MAIL_HOST=smtp.mailtrap.io
@@ -30,8 +36,24 @@ MAIL_API_PROVIDER='sendgrid'
 
 PASSWORD_EXPIRATION_SKIP_USERS=admin
 
+# Nameservers shown in zone settings
+DNS_NS1=
+DNS_NS2=
+DNS_NS3=
+DNS_NS4=
+DNS_NS5=
+DNS_NS6=
+DNS_NS7=
+DNS_NS8=
+DNS_NS9=
+DNS_NS10=
+DNS_NS11=
+DNS_NS12=
+DNS_NS13=
+
 # AnycastDNS
 DNS_ANYCASTDNS_API_KEY=
+DNS_ANYCASTDNS_SERVER_ID=0
 
 # Bind
 DNS_BIND_API_KEY=
@@ -53,12 +75,25 @@ DNS_DESEC_API_KEY=
 # DNSimple
 DNS_DNSIMPLE_API_KEY=
 
+# DigitalOcean
+DNS_DIGITALOCEAN_API_KEY=
+
+# Gandi LiveDNS
+DNS_GANDILIVEDNS_API_KEY=
+DNS_GANDILIVEDNS_SHARING_ID=
+DNS_GANDILIVEDNS_AUTH_SCHEME=Bearer
+
 # Hetzner
 DNS_HETZNER_API_KEY=
 
 # PowerDNS
 DNS_POWERDNS_API_KEY=
 DNS_POWERDNS_POWERDNS_IP=
+
+# Scaleway
+DNS_SCALEWAY_API_KEY=
+DNS_SCALEWAY_PROJECT_ID=
+DNS_SCALEWAY_PARENT_DOMAIN=
 
 # Vultr
 DNS_VULTR_API_KEY=

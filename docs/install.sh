@@ -110,6 +110,7 @@ apt-get install -y curl wget ca-certificates gnupg lsb-release software-properti
 echo
 log "Basic configuration"
 
+PHP_MEMORY_LIMIT="256M"
 DEFAULT_HOST="ndm.local"
 prompt HOSTNAME "Enter your NDM hostname (FQDN for HTTPS)" "$DEFAULT_HOST"
 prompt TLS_EMAIL "Enter email for Caddy TLS/Cert notifications" "admin@$HOSTNAME"
@@ -160,7 +161,7 @@ log "Hardening PHP configuration (sessions, OPCache)…"
 # Update php.ini (FPM)
 set_php_ini_value "/etc/php/8.3/fpm/php.ini" "session.cookie_secure" "1"
 set_php_ini_value "/etc/php/8.3/fpm/php.ini" "session.cookie_httponly" "1"
-set_php_ini_value "/etc/php/8.3/fpm/php.ini" "session.cookie_samesite" "\"Strict\""
+set_php_ini_value "/etc/php/8.3/fpm/php.ini" "session.cookie_samesite" "\"Lax\""
 set_php_ini_value "/etc/php/8.3/fpm/php.ini" "memory_limit" "$PHP_MEMORY_LIMIT"
 
 set_php_ini_value "/etc/php/8.3/mods-available/opcache.ini" "opcache.enable" "1"
@@ -202,22 +203,22 @@ MARIADB_SUITE=""
 
 if [[ "${OS_ID}" == "ubuntu" ]]; then
   MARIADB_URI="https://mirror.nextlayer.at/mariadb/repo/11.rolling/ubuntu"
-  if [[ "${VER}" == "22.04" ]]; then
+  if [[ "${OS_VER}" == "22.04" ]]; then
     MARIADB_SUITE="jammy"
-  elif [[ "${VER}" == "24.04" ]]; then
+  elif [[ "${OS_VER}" == "24.04" ]]; then
     MARIADB_SUITE="noble"
   else
-    echo "Unsupported Ubuntu version for MariaDB repo: ${VER}"
+    echo "Unsupported Ubuntu version for MariaDB repo: ${OS_VER}"
     exit 1
   fi
 elif [[ "${OS_ID}" == "debian" ]]; then
   MARIADB_URI="https://mirror.nextlayer.at/mariadb/repo/11.rolling/debian"
-  if [[ "${VER}" == "12" ]]; then
+  if [[ "${OS_VER}" == "12" ]]; then
     MARIADB_SUITE="bookworm"
-  elif [[ "${VER}" == "13" ]]; then
+  elif [[ "${OS_VER}" == "13" ]]; then
     MARIADB_SUITE="trixie"
   else
-    echo "Unsupported Debian version for MariaDB repo: ${VER}"
+    echo "Unsupported Debian version for MariaDB repo: ${OS_VER}"
     exit 1
   fi
 else
@@ -299,6 +300,11 @@ if [[ ! -f ".env" ]]; then
   cp env-sample .env
 fi
 sed -i "s|^APP_URL=.*|APP_URL=https://${HOSTNAME//\//\\/}|" .env
+sed -i "s|^APP_DOMAIN=.*|APP_DOMAIN=${HOSTNAME//\//\\/}|" .env
+if grep -q '^WEBAUTHN_DUMMY_SECRET=change-this' .env; then
+  WEBAUTHN_DUMMY_SECRET=$(openssl rand -hex 32)
+  sed -i "s|^WEBAUTHN_DUMMY_SECRET=.*|WEBAUTHN_DUMMY_SECRET=${WEBAUTHN_DUMMY_SECRET}|" .env
+fi
 
 # DB DSN/env
 case "$DB_BACKEND" in

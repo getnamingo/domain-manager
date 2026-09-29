@@ -58,6 +58,29 @@ function envi($var, $default=null)
     return $default;
 }
 
+function validateWebAuthnClientData(string $encodedClientData): string
+{
+    $clientDataJSON = base64_decode($encodedClientData, true);
+    if ($clientDataJSON === false) {
+        throw new \InvalidArgumentException('Invalid WebAuthn client data.');
+    }
+
+    $clientData = json_decode($clientDataJSON, true, 512, JSON_THROW_ON_ERROR);
+    $expectedOrigin = rtrim((string) envi('APP_URL'), '/');
+
+    if (
+        !is_array($clientData)
+        || !isset($clientData['origin'])
+        || !hash_equals($expectedOrigin, (string)$clientData['origin'])
+        || ($clientData['crossOrigin'] ?? false) !== false
+        || isset($clientData['topOrigin'])
+    ) {
+        throw new \InvalidArgumentException('Invalid WebAuthn origin.');
+    }
+
+    return $clientDataJSON;
+}
+
 /**
  * Start session
  */
@@ -254,11 +277,14 @@ function get_client_ip() {
 
 function get_client_location() {
     $PublicIP = get_client_ip();
-    $json     = file_get_contents("http://ipinfo.io/$PublicIP/geo");
-    $json     = json_decode($json, true);
-    $country  = $json['country'];
+    $json = @file_get_contents("https://ipinfo.io/$PublicIP/geo");
 
-    return $country;
+    if ($json === false) {
+        return 'AQ';
+    }
+
+    $json = json_decode($json, true);
+    return is_array($json) ? ($json['country'] ?? 'AQ') : 'AQ';
 }
 
 function normalizePhoneNumber($number, $defaultRegion = 'US') {
@@ -552,63 +578,211 @@ function sign($ts, $method, $path, $body, $secret_key) {
     return hash_hmac('sha256', $stringToSign, $secret_key);
 }
 
-function getProviderCredentials(string $provider): ?array {
-    // Convert provider name to uppercase (matches env variables)
-    $providerKey = strtoupper(str_replace(' ', '_', $provider));
+function dnsProviderMap(): array
+{
+    return [
+        'ANYCASTDNS' => 'AnycastDNS',
+        'BIND' => 'Bind',
+        'BUNNY' => 'Bunny',
+        'CLOUDFLARE' => 'Cloudflare',
+        'CLOUDNS' => 'ClouDNS',
+        'DESEC' => 'Desec',
+        'DNSIMPLE' => 'DNSimple',
+        'DIGITALOCEAN' => 'DigitalOcean',
+        'GANDILIVEDNS' => 'GandiLiveDNS',
+        'HETZNER' => 'Hetzner',
+        'POWERDNS' => 'PowerDNS',
+        'SCALEWAY' => 'Scaleway',
+        'VULTR' => 'Vultr',
+    ];
+}
 
-    // Get all environment variables
-    $envVars = $_ENV;
+function dnsProviderKey(string $provider): string
+{
+    $needle = strtoupper(str_replace([' ', '-', '_'], '', trim($provider)));
 
-    // Find all keys related to this provider (keys start with "DNS_{PROVIDER}_")
-    $credentials = [];
-    foreach ($envVars as $key => $value) {
-        if (strpos($key, "DNS_{$providerKey}_") === 0 && !empty($value)) {
-            // Extract the field name after "DNS_{PROVIDER}_"
-            $field = str_replace("DNS_{$providerKey}_", '', $key);
-            $credentials[$field] = $value;
+    foreach (dnsProviderMap() as $key => $display) {
+        if (
+            strtoupper(str_replace([' ', '-', '_'], '', $key)) === $needle
+            || strtoupper(str_replace([' ', '-', '_'], '', $display)) === $needle
+        ) {
+            return $key;
         }
     }
 
-    // Return credentials only if they have values, otherwise return null
-    return !empty($credentials) ? $credentials : null;
+    return strtoupper(str_replace(' ', '_', trim($provider)));
 }
 
-function getActiveProviders(): array {
-    $activeProviders = [];
-    
+function getProviderCredentials(string $provider): ?array
+{
+    $providerKey = dnsProviderKey($provider);
+    $credentials = [];
+
     foreach ($_ENV as $key => $value) {
-        if (strpos($key, 'DNS_') === 0 && !empty($value)) {
-            // Extract provider name (between "DNS_" and "_FIELDNAME")
-            preg_match('/DNS_([^_]+)_/', $key, $matches);
-            if (!empty($matches[1])) {
-                $providerName = $matches[1];
-                
-                // Add provider only if it hasn't been added already
-                if (!isset($activeProviders[$providerName])) {
-                    $activeProviders[$providerName] = str_replace('_', ' ', ucfirst(strtolower($providerName)));
-                }
-            }
+        $prefix = "DNS_{$providerKey}_";
+        if (str_starts_with((string)$key, $prefix) && $value !== null && $value !== '') {
+            $credentials[substr((string)$key, strlen($prefix))] = $value;
+        }
+    }
+
+    return $credentials !== [] ? $credentials : null;
+}
+
+function getActiveProviders(): array
+{
+    $activeProviders = [];
+
+    foreach (dnsProviderMap() as $key => $display) {
+        $credentials = getProviderCredentials($key);
+        if ($credentials !== null) {
+            $activeProviders[$key] = $display === 'GandiLiveDNS' ? 'Gandi LiveDNS' : $display;
         }
     }
 
     return $activeProviders;
 }
 
-function getProviderDisplayName(string $provider): string {
-    $providerNames = [
-        'ANYCASTDNS'  => 'AnycastDNS',
-        'BIND9'       => 'Bind',
-        'BUNNY'       => 'Bunny',
-        'CLOUDFLARE'  => 'Cloudflare',
-        'CLOUDNS'     => 'ClouDNS',
-        'DESEC'       => 'Desec',
-        'DNSIMPLE'    => 'DNSimple',
-        'HETZNER'     => 'Hetzner',
-        'POWERDNS'    => 'PowerDNS',
-        'VULTR'       => 'Vultr',
+function getProviderDisplayName(string $provider): string
+{
+    $key = dnsProviderKey($provider);
+    return dnsProviderMap()[$key] ?? trim($provider);
+}
+
+function getConfiguredNameservers(): array
+{
+    $nameservers = [];
+    for ($i = 1; $i <= 13; $i++) {
+        $value = trim((string)envi('DNS_NS' . $i, ''));
+        if ($value !== '') {
+            $nameservers[] = rtrim($value, '.');
+        }
+    }
+
+    return array_values(array_unique($nameservers));
+}
+
+function buildDnsProviderConfig(string $provider, string $domainName, array $persisted = []): array
+{
+    $providerDisplay = getProviderDisplayName($provider);
+    $credentials = getProviderCredentials($provider);
+
+    if ($credentials === null) {
+        throw new \RuntimeException("Missing DNS credentials for provider {$providerDisplay}.");
+    }
+
+    $config = [
+        'domain_name' => strtolower(rtrim(trim($domainName), '.')),
+        'provider' => $providerDisplay,
     ];
 
-    return $providerNames[strtoupper($provider)] ?? ucfirst(strtolower($provider));
+    if (!empty($credentials['API_KEY'])) {
+        $config['apikey'] = $credentials['API_KEY'];
+    }
+
+    switch ($providerDisplay) {
+        case 'ClouDNS':
+            if (empty($credentials['AUTH_ID']) || empty($credentials['AUTH_PASSWORD'])) {
+                throw new \RuntimeException('ClouDNS requires AUTH_ID and AUTH_PASSWORD.');
+            }
+            $config['cloudns_auth_id'] = $credentials['AUTH_ID'];
+            $config['cloudns_auth_password'] = $credentials['AUTH_PASSWORD'];
+            break;
+
+        case 'Bind':
+            if (empty($credentials['API_KEY'])) {
+                throw new \RuntimeException('Bind requires API_KEY.');
+            }
+            $config['bindip'] = trim((string)($credentials['BIND_IP'] ?? '127.0.0.1'));
+            break;
+
+        case 'PowerDNS':
+            if (empty($credentials['API_KEY'])) {
+                throw new \RuntimeException('PowerDNS requires API_KEY.');
+            }
+            $config['powerdnsip'] = trim((string)($credentials['POWERDNS_IP'] ?? '127.0.0.1'));
+            $config['pdns_master_ip'] = $config['powerdnsip'];
+            break;
+
+        case 'AnycastDNS':
+            if (empty($credentials['API_KEY'])) {
+                throw new \RuntimeException('AnycastDNS requires API_KEY.');
+            }
+            $config['serverid'] = isset($credentials['SERVER_ID']) ? (int)$credentials['SERVER_ID'] : 0;
+            break;
+
+        case 'Scaleway':
+            if (empty($credentials['API_KEY']) || empty($credentials['PROJECT_ID'])) {
+                throw new \RuntimeException('Scaleway requires API_KEY and PROJECT_ID.');
+            }
+            $config['project_id'] = trim((string)$credentials['PROJECT_ID']);
+            $parent = trim((string)($credentials['PARENT_DOMAIN'] ?? ''));
+            if ($parent !== '') {
+                $config['parent_domain'] = strtolower(rtrim($parent, '.'));
+            }
+            break;
+
+        case 'GandiLiveDNS':
+            if (empty($credentials['API_KEY'])) {
+                throw new \RuntimeException('Gandi LiveDNS requires API_KEY.');
+            }
+            $sharingId = trim((string)($credentials['SHARING_ID'] ?? ''));
+            if ($sharingId !== '') {
+                $config['sharing_id'] = $sharingId;
+            }
+            $config['auth_scheme'] = trim((string)($credentials['AUTH_SCHEME'] ?? 'Bearer')) ?: 'Bearer';
+            break;
+
+        default:
+            if (empty($credentials['API_KEY'])) {
+                throw new \RuntimeException("{$providerDisplay} requires API_KEY.");
+            }
+            break;
+    }
+
+    if (in_array($providerDisplay, ['Bind', 'PowerDNS'], true)) {
+        for ($i = 2; $i <= 13; $i++) {
+            if (!empty($credentials['API_KEY_NS' . $i])) {
+                $config['apikey_ns' . $i] = $credentials['API_KEY_NS' . $i];
+            }
+            if ($providerDisplay === 'Bind' && !empty($credentials['BIND_IP_NS' . $i])) {
+                $config['bindip_ns' . $i] = $credentials['BIND_IP_NS' . $i];
+            }
+            if ($providerDisplay === 'PowerDNS' && !empty($credentials['POWERDNS_IP_NS' . $i])) {
+                $config['powerdnsip_ns' . $i] = $credentials['POWERDNS_IP_NS' . $i];
+            }
+        }
+    }
+
+    // Structural identifiers belong to the zone that was provisioned. Preserve
+    // them even if the administrator later changes global .env settings.
+    if (($persisted['provider'] ?? $providerDisplay) === $providerDisplay) {
+        $structuralKeys = match ($providerDisplay) {
+            'Scaleway' => ['project_id', 'parent_domain'],
+            'AnycastDNS' => ['serverid'],
+            'GandiLiveDNS' => ['sharing_id'],
+            default => [],
+        };
+        foreach ($structuralKeys as $key) {
+            if (array_key_exists($key, $persisted)) {
+                $config[$key] = $persisted[$key];
+            }
+        }
+    }
+
+    return $config;
+}
+
+function dnsStructuralConfig(array $config): array
+{
+    $safe = ['provider' => $config['provider'] ?? null];
+
+    foreach (['project_id', 'parent_domain', 'serverid', 'sharing_id'] as $key) {
+        if (array_key_exists($key, $config)) {
+            $safe[$key] = $config[$key];
+        }
+    }
+
+    return $safe;
 }
 
 function validate_label($domain, $db) {

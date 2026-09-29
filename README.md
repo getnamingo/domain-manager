@@ -13,23 +13,15 @@ Namingo Domain Manager is a powerful and flexible tool for managing **DNS zones*
 
 ✅ **Support for popular DNS providers** – Works with multiple DNS services.
 
-✅ **Fast and secure** – Uses API keys for authentication and ensures secure communication.
+✅ **Fast and secure** – Uses provider APIs through Cardo DNS, hardened sessions, CSRF-protected state changes, and production-ready passkey support.
 
 ## Supported Providers
-Namingo Domain Manager supports the following **DNS providers**, each requiring specific credentials:
 
-| Provider    | Credentials | Status | DNSSEC |
-|------------|---------------------|------------|---------------------|
-| **AnycastDNS** | `API_KEY` | ✅ | ❌ |
-| **Bind9** | `API_KEY:BIND_IP` | ✅ | 🚧 |
-| **Bunny** | `API_KEY` | | ✅ | ✅ |
-| **Cloudflare** | `EMAIL:API_KEY` or `API_TOKEN` | ✅ | ❌ |
-| **ClouDNS** | `AUTH_ID:AUTH_PASSWORD` | ✅ | ✅ |
-| **Desec** | `API_KEY` | ✅ | ✅ |
-| **DNSimple** | `API_KEY` | ✅ | ❌ |
-| **Hetzner** | `API_KEY` | 🚧 | ❌ |
-| **PowerDNS** | `API_KEY:POWERDNS_IP` | ✅ | ✅ |
-| **Vultr** | `API_KEY` | ✅ | ❌ |
+Namingo Domain Manager uses **Cardo DNS 1.1+** for provider integration. See the authoritative [Cardo DNS supported providers table](https://github.com/getnamingo/cardo-dns#supported-providers) for current provider availability, credentials, record support, requirements, and DNSSEC capabilities.
+
+Domain Manager discovers configured Cardo providers from `.env`, including DigitalOcean, Gandi LiveDNS, Scaleway, and the existing AnycastDNS, BIND, Bunny, Cloudflare, ClouDNS, deSEC, DNSimple, Hetzner, PowerDNS, and Vultr integrations.
+
+The zone editor shows configured/assigned nameservers and live DNSSEC state at the bottom of the page. Where the provider supports it, DNSSEC can be enabled or disabled and DS records are shown for publication at the registrar.
 
 ## Documentation
 
