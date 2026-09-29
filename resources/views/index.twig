@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="{{ _lang ?: 'en' }}" dir="{{ _lang in ['ar', 'ar_SA'] ? 'rtl' : 'ltr' }}"{% if screen_mode == 'dark' %} data-bs-theme="dark"{% endif %}{% if theme is not defined or theme is empty %} data-bs-theme-primary="purple"{% else %} data-bs-theme-primary="{{ theme }}"{% endif %}>
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
@@ -10,9 +10,9 @@
     <title>Home | Domain Manager</title>
     {% include 'partials/css.twig' %}
 </head>
-<body class="d-flex flex-column min-vh-100 bg-light">
+<body class="d-flex flex-column min-vh-100">
     <header>
-        <nav class="navbar navbar-expand-lg h-100 navbar-light bg-white border-bottom shadow-sm">
+        <nav class="navbar navbar-expand-lg h-100 border-bottom shadow-sm">
             <div class="container-xl">
                 <a class="navbar-brand" href="."><img src="{{ logoPath }}" style="height: 35px; width: auto;" /></a>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -60,7 +60,7 @@
     </header>
 
     <main class="flex-grow-1">
-        <div class="container-fluid p-5 rounded-3 bg-light text-center">
+        <div class="container-fluid p-5 rounded-3 text-center">
             <div class="text-center my-5">
                 <h1 class="fw-bold">DNS Panel</h1>
             </div>
@@ -114,7 +114,7 @@
         </div>
     </main>
 
-    <footer class="footer bg-white border-top shadow-sm py-3">
+    <footer class="footer border-top shadow-sm py-3">
         <div class="container-xl">
             <span class="text-muted">&copy; {{ 'now' | date('Y') }} <strong>{{ app_name }}</strong>. All rights reserved.</span>
         </div>
