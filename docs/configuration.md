@@ -7,41 +7,50 @@ If you have not installed the panel yet, please start with **[install.md](instal
 
 ## Overview
 
-Namingo Domain Manager supports two types of DNS providers:
+Namingo Domain Manager uses **Cardo DNS 1.1+**. Provider support and DNSSEC capabilities are maintained in the [Cardo DNS supported providers table](https://github.com/getnamingo/cardo-dns#supported-providers).
 
-1. **Cloud-based DNS providers**
-   - Example: Cloudflare, DNSimple, AnycastDNS, etc.
-   - API-based configuration using `.env`
-   - Zones are created using each provider’s API
-
-2. **Self-hosted DNS servers**
-   - Supported:
-     - **PowerDNS**
-     - **BIND9**
-   - Domain Manager connects to your master and slave servers through an API layer
-
-All configuration is done using your **`.env` file**, located in the directory where Domain Manager is installed.
-
----
+All provider credentials are read from the application's **`.env`** file. A provider appears in **Zones → New Zone** when at least one credential/configuration value exists for its explicit provider prefix. Generic settings such as `DNS_NS1` are never mistaken for providers.
 
 # 1. Cloud-Based DNS Providers
 
-## Add API credentials
-
-Open your `.env` file and add the authentication values for each provider you want to use.
-
-Example (Cloudflare):
+Common examples:
 
 ```env
-DNS_CLOUDFLARE_API_KEY=your_key_here
+# DigitalOcean
+DNS_DIGITALOCEAN_API_KEY=
+
+# Gandi LiveDNS
+DNS_GANDILIVEDNS_API_KEY=
+DNS_GANDILIVEDNS_SHARING_ID=
+DNS_GANDILIVEDNS_AUTH_SCHEME=Bearer
+
+# Scaleway
+DNS_SCALEWAY_API_KEY=
+DNS_SCALEWAY_PROJECT_ID=
+DNS_SCALEWAY_PARENT_DOMAIN=
+
+# Cloudflare
+DNS_CLOUDFLARE_API_KEY=
+
+# ClouDNS
+DNS_CLOUDNS_AUTH_ID=
+DNS_CLOUDNS_AUTH_PASSWORD=
+
+# AnycastDNS
+DNS_ANYCASTDNS_API_KEY=
+DNS_ANYCASTDNS_SERVER_ID=0
 ```
+
+For Scaleway, `PROJECT_ID` is required. `PARENT_DOMAIN` is optional and is used for delegated child zones. Domain Manager persists the structural parent/project information with each created zone so later global configuration changes cannot make a root zone look like a child zone, or vice versa.
+
+For Gandi LiveDNS, Bearer authentication is recommended. `SHARING_ID` is optional for organization sharing contexts.
 
 # 2. Self-hosted DNS servers
 
 ## Configure Your Nameservers (NS1 to NS13)
 
 Add the list of your nameservers to the `.env` file.  
-This defines the master (`ns1`) and any slave servers (`ns2`–`ns13`), so Domain Manager can insert the correct NS records automatically when creating new zones.
+These nameservers are displayed in each zone's **Zone Settings** card. Cloudflare-assigned nameservers are shown automatically when available.
 
 ```env
 # Nameservers (NS1 to NS13)
@@ -167,3 +176,16 @@ This reloads configuration and **enables the provider** in the UI.
 ## Create zones
 
 In the UI click **Zones → New Zone** and you should now see the providers you configured.
+
+# 4. WebAuthn / Passkeys
+
+Passkeys are disabled by default. To enable them, configure the relying-party hostname and a private dummy secret used to avoid account enumeration during passkey challenge creation:
+
+```env
+APP_URL=https://dns.example.com
+APP_DOMAIN=dns.example.com
+WEB_AUTHN_ENABLED=true
+WEBAUTHN_DUMMY_SECRET=replace-with-a-random-secret-of-at-least-32-characters
+```
+
+The installer generates a random dummy secret automatically. Keep `APP_URL` and `APP_DOMAIN` aligned with the HTTPS hostname used by browsers.
