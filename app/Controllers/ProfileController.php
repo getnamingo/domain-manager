@@ -25,12 +25,15 @@ use Respect\Validation\Validator as v;
 
 class ProfileController extends Controller
 {
+    private $webAuthn;
+
     public function __construct(ContainerInterface $container) {
         parent::__construct($container);
 
-        $rpName = 'DNS';
-        $rpId = envi('APP_DOMAIN');
-        $this->webAuthn = new \lbuchs\WebAuthn\WebAuthn($rpName, $rpId, ['android-key', 'android-safetynet', 'apple', 'fido-u2f', 'packed', 'tpm']);
+        $this->webAuthn = null;
+        if (envi('WEB_AUTHN_ENABLED') === 'true') {
+            $this->webAuthn = new \lbuchs\WebAuthn\WebAuthn('Namingo Domain Manager', envi('APP_DOMAIN'));
+        }
     }
 
     public function profile(Request $request, Response $response)
@@ -43,7 +46,7 @@ class ProfileController extends Controller
         $username = $session['auth_username'];
 
         // Determine role
-        $roleMap = [0 => 'Administrator', 4 => 'Zone Administrator'];
+        $roleMap = [0 => 'Administrator', 4 => 'Client'];
         $role = $roleMap[$session['auth_roles']] ?? 'Unknown';
 
         // Determine status
@@ -81,14 +84,25 @@ class ProfileController extends Controller
         // Add security options to payload
         if ($is2FA) {
             // No QR code shown
+            $data['isWebaEnabled'] = false;
         } elseif ($webauthn) {
             $data['qrcodeDataUri'] = $qrcodeDataUri;
             $data['secret'] = $secret;
             $data['weba'] = $webauthn;
+            $data['isWebaEnabled'] = $isWebAuthnEnabled;
         } else {
             $data['qrcodeDataUri'] = $qrcodeDataUri;
             $data['secret'] = $secret;
             $data['isWebaEnabled'] = $isWebAuthnEnabled;
+        }
+
+        $contacts = $db->select("SELECT * FROM users_contact WHERE user_id = ?", [ $userId ]);
+        if ($contacts) {
+            $data['contacts'] = $contacts;
+
+            $iso3166 = new ISO3166();
+            $countries = $iso3166->all();
+            $data['countries'] = $countries;
         }
 
         return view($response, 'admin/profile/profile.twig', $data);
@@ -164,39 +178,87 @@ class ProfileController extends Controller
 
     public function getRegistrationChallenge(Request $request, Response $response)
     {
+        global $container;
+
+        if ($this->webAuthn === null) {
+            $response->getBody()->write(json_encode(['success' => false, 'msg' => 'WebAuthn is disabled.']));
+            return $response->withHeader('Content-Type', 'application/json')->withStatus(404);
+        }
+
         $userName = $_SESSION['auth_username'];
         $userEmail = $_SESSION['auth_email'];
         $userId = $_SESSION['auth_user_id'];
+        $registrations = $container->get('db')->select(
+            'SELECT credential_id FROM users_webauthn WHERE user_id = ?',
+            [$userId]
+        ) ?: [];
+        $credentialIds = [];
+        foreach ($registrations as $registration) {
+            $credentialId = base64_decode($registration['credential_id'], true);
+            if ($credentialId !== false) {
+                $credentialIds[] = $credentialId;
+            }
+        }
+
         $hexUserId = dechex($userId);
         // Ensure even length for the hexadecimal string
         if(strlen($hexUserId) % 2 != 0){
             $hexUserId = '0' . $hexUserId;
         }
-        $createArgs = $this->webAuthn->getCreateArgs(\hex2bin($hexUserId), $userEmail, $userName, 60*4, false, 'discouraged', null);
+        $createArgs = $this->webAuthn->getCreateArgs(\hex2bin($hexUserId), $userEmail, $userName, 60*5, 'preferred', 'required', null, $credentialIds);
 
         $response->getBody()->write(json_encode($createArgs));
-        $_SESSION["challenge"] = ($this->webAuthn->getChallenge())->getBinaryString();
+        $_SESSION['webauthn_registration'] = [
+            'challenge' => ($this->webAuthn->getChallenge())->getBinaryString(),
+            'user_id' => $userId,
+            'expires_at' => time() + 300
+        ];
         
-        return $response->withHeader('Content-Type', 'application/json');
+        return $response
+            ->withHeader('Content-Type', 'application/json')
+            ->withHeader('Cache-Control', 'no-store');
     }
-    
+
     public function verifyRegistration(Request $request, Response $response)
     {
-        $data = json_decode($request->getBody()->getContents(), null, 512, JSON_THROW_ON_ERROR);
-        $userName = $_SESSION['auth_username'];
-        $userEmail = $_SESSION['auth_email'];
-        $userId = $_SESSION['auth_user_id'];
+        global $container;
 
         try {
+            if ($this->webAuthn === null) {
+                throw new \RuntimeException('WebAuthn is disabled.');
+            }
+
+            $ceremony = $_SESSION['webauthn_registration'] ?? null;
+            unset($_SESSION['webauthn_registration']);
+
+            $userName = $_SESSION['auth_username'];
+            $userEmail = $_SESSION['auth_email'];
+            $userId = $_SESSION['auth_user_id'];
+            if (
+                !is_array($ceremony)
+                || (int) ($ceremony['user_id'] ?? 0) !== (int) $userId
+                || (int) ($ceremony['expires_at'] ?? 0) < time()
+            ) {
+                throw new \RuntimeException('WebAuthn registration challenge is invalid or expired.');
+            }
+
+            $data = json_decode($request->getBody()->getContents(), null, 512, JSON_THROW_ON_ERROR);
+
             // Decode the incoming data
-            $clientDataJSON = base64_decode($data->clientDataJSON);
-            $attestationObject = base64_decode($data->attestationObject);
+            $clientDataJSON = validateWebAuthnClientData((string) ($data->clientDataJSON ?? ''));
+            $attestationObject = base64_decode((string) ($data->attestationObject ?? ''), true);
+            if ($attestationObject === false) {
+                throw new \InvalidArgumentException('Invalid WebAuthn attestation data.');
+            }
 
             // Retrieve the challenge from the session
-            $challenge = $_SESSION['challenge'];
+            $challenge = $ceremony['challenge'];
 
             // Process the WebAuthn response
-            $credential = $this->webAuthn->processCreate($clientDataJSON, $attestationObject, $challenge, 'discouraged', true, false);
+            $credential = $this->webAuthn->processCreate($clientDataJSON, $attestationObject, $challenge, true, true, false);
+            if (strlen($credential->credentialId) > 1023) {
+                throw new \RuntimeException('WebAuthn credential ID is too long.');
+            }
 
             // add user infos
             $credential->userId = $userId;
@@ -204,28 +266,40 @@ class ProfileController extends Controller
             $credential->userDisplayName = $userName;
 
             // Store the credential data in the database
-            $db = $this->container->get('db');
+            $db = $container->get('db');
             $counter = is_null($credential->signatureCounter) ? 0 : $credential->signatureCounter;
-            $db->insert(
-                'users_webauthn',
-                [
-                    'user_id' => $userId,
-                    'credential_id' => base64_encode($credential->credentialId),
-                    'public_key' => $credential->credentialPublicKey,
-                    'attestation_object' => base64_encode($attestationObject),
-                    'user_agent' => $_SERVER['HTTP_USER_AGENT'],
-                    'sign_count' => $counter
-                ]
-            );
-            $db->update(
-                'users',
-                [
-                    'auth_method' => 'webauthn'
-                ],
-                [
-                    'id' => $userId
-                ]
-            );
+            $credentialId = base64_encode($credential->credentialId);
+            if ($db->selectValue('SELECT id FROM users_webauthn WHERE credential_id = ? LIMIT 1', [$credentialId])) {
+                throw new \RuntimeException('This WebAuthn credential is already registered.');
+            }
+
+            $db->beginTransaction();
+            try {
+                $db->insert(
+                    'users_webauthn',
+                    [
+                        'user_id' => $userId,
+                        'credential_id' => $credentialId,
+                        'public_key' => $credential->credentialPublicKey,
+                        'attestation_object' => base64_encode($attestationObject),
+                        'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? '',
+                        'sign_count' => $counter
+                    ]
+                );
+                $db->update(
+                    'users',
+                    [
+                        'auth_method' => 'webauthn'
+                    ],
+                    [
+                        'id' => $userId
+                    ]
+                );
+                $db->commit();
+            } catch (\Throwable $e) {
+                $db->rollBack();
+                throw $e;
+            }
 
             $msg = 'Registration success.';
             if ($credential->rootValid === false) {
@@ -239,9 +313,9 @@ class ProfileController extends Controller
             // Send success response
             $response->getBody()->write(json_encode($return));
             return $response->withHeader('Content-Type', 'application/json');
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             // Handle error, return an appropriate response
-            $response->getBody()->write(json_encode(['error' => $e->getMessage()]));
+            $response->getBody()->write(json_encode(['success' => false, 'msg' => $e->getMessage()]));
             return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
         }
     }
@@ -298,6 +372,166 @@ class ProfileController extends Controller
         // Write response body and return with JSON header
         $response->getBody()->write($csrfResponse);
         return $response->withHeader('Content-Type', 'application/json')->withStatus(200);
+    }
+
+    public function updateContacts(Request $request, Response $response)
+    {
+        if ($request->getMethod() === 'POST') {
+            // Retrieve POST data
+            $data = $request->getParsedBody();
+            $db = $this->container->get('db');
+            $userId = $_SESSION['auth_user_id'];
+            $username = $_SESSION['auth_username'];
+
+            $data['owner']['cc'] = strtoupper($data['owner']['cc']);
+            $data['billing']['cc'] = strtoupper($data['billing']['cc']);
+            $data['tech']['cc'] = strtoupper($data['tech']['cc']);
+            $data['abuse']['cc'] = strtoupper($data['abuse']['cc']);
+
+            $phoneValidator = v::regex('/^\+\d{1,3}\.\d{2,12}$/');
+
+            // Define validation for nested fields
+            $contactValidator = [
+                v::key('first_name', v::stringType()->notEmpty()->length(1, 255), true),
+                v::key('last_name', v::stringType()->notEmpty()->length(1, 255), true),
+                v::key('org', v::optional(v::stringType()->length(1, 255)), false),
+                v::key('street1', v::optional(v::stringType()), false),
+                v::key('city', v::stringType()->notEmpty(), true),
+                v::key('sp', v::optional(v::stringType()), false),
+                v::key('pc', v::optional(v::stringType()), false),
+                v::key('cc', v::countryCode(), true),
+                v::key('voice', v::optional($phoneValidator), false),
+                v::key('fax', v::optional(v::phone()), false),
+                v::key('email', v::email(), true)
+            ];
+            
+            $validators = [
+                'owner' => v::optional(v::keySet(...$contactValidator)),
+                'billing' => v::optional(v::keySet(...$contactValidator)),
+                'tech' => v::optional(v::keySet(...$contactValidator)),
+                'abuse' => v::optional(v::keySet(...$contactValidator))
+            ];
+
+            $errors = [];
+            foreach ($validators as $field => $validator) {
+                try {
+                    $validator->assert(isset($data[$field]) ? $data[$field] : []);
+                } catch (\Respect\Validation\Exceptions\NestedValidationException $e) {
+                    $errors[$field] = $e->getMessages();
+                }
+            }
+
+            if (!empty($errors)) {
+                // Handle errors
+                $errorText = '';
+
+                foreach ($errors as $field => $messages) {
+                    $errorText .= ucfirst($field) . ' errors: ' . implode(', ', $messages) . '; ';
+                }
+
+                // Trim the final semicolon and space
+                $errorText = rtrim($errorText, '; ');
+                
+                $this->container->get('flash')->addMessage('error', $errorText);
+                return $response->withHeader('Location', '/profile')->withStatus(302);
+            }
+
+            $db->beginTransaction();
+
+            try {
+                $currentDateTime = new \DateTime();
+                $update = $currentDateTime->format('Y-m-d H:i:s.v');
+
+                $db->update(
+                    'users_contact',
+                    [
+                        'first_name' => $data['owner']['first_name'],
+                        'last_name' => $data['owner']['last_name'],
+                        'org' => $data['owner']['org'],
+                        'street1' => $data['owner']['street1'],
+                        'city' => $data['owner']['city'],
+                        'sp' => $data['owner']['sp'],
+                        'pc' => $data['owner']['pc'],
+                        'cc' => strtolower($data['owner']['cc']),
+                        'voice' => $data['owner']['voice'],
+                        'email' => $data['owner']['email']
+                    ],
+                    [
+                        'user_id' => $userId,
+                        'type' => 'owner'
+                    ]
+                );
+
+                $db->update(
+                    'users_contact',
+                    [
+                        'first_name' => $data['billing']['first_name'],
+                        'last_name' => $data['billing']['last_name'],
+                        'org' => $data['billing']['org'],
+                        'street1' => $data['billing']['street1'],
+                        'city' => $data['billing']['city'],
+                        'sp' => $data['billing']['sp'],
+                        'pc' => $data['billing']['pc'],
+                        'cc' => strtolower($data['billing']['cc']),
+                        'voice' => $data['billing']['voice'],
+                        'email' => $data['billing']['email']
+                    ],
+                    [
+                        'user_id' => $userId,
+                        'type' => 'billing'
+                    ]
+                );
+                
+                $db->update(
+                    'users_contact',
+                    [
+                        'first_name' => $data['tech']['first_name'],
+                        'last_name' => $data['tech']['last_name'],
+                        'org' => $data['tech']['org'],
+                        'street1' => $data['tech']['street1'],
+                        'city' => $data['tech']['city'],
+                        'sp' => $data['tech']['sp'],
+                        'pc' => $data['tech']['pc'],
+                        'cc' => strtolower($data['tech']['cc']),
+                        'voice' => $data['tech']['voice'],
+                        'email' => $data['tech']['email']
+                    ],
+                    [
+                        'user_id' => $userId,
+                        'type' => 'tech'
+                    ]
+                );
+                
+                $db->update(
+                    'users_contact',
+                    [
+                        'first_name' => $data['abuse']['first_name'],
+                        'last_name' => $data['abuse']['last_name'],
+                        'org' => $data['abuse']['org'],
+                        'street1' => $data['abuse']['street1'],
+                        'city' => $data['abuse']['city'],
+                        'sp' => $data['abuse']['sp'],
+                        'pc' => $data['abuse']['pc'],
+                        'cc' => strtolower($data['abuse']['cc']),
+                        'voice' => $data['abuse']['voice'],
+                        'email' => $data['abuse']['email']
+                    ],
+                    [
+                        'user_id' => $userId,
+                        'type' => 'abuse'
+                    ]
+                );
+
+                $db->commit();
+            } catch (Exception $e) {
+                $db->rollBack();
+                $this->container->get('flash')->addMessage('error', 'Database failure during update: ' . $e->getMessage());
+                return $response->withHeader('Location', '/profile')->withStatus(302);
+            }
+
+            $this->container->get('flash')->addMessage('success', 'User ' . $username . ' has been updated successfully on ' . $update);
+            return $response->withHeader('Location', '/profile')->withStatus(302);
+        }
     }
 
 }
