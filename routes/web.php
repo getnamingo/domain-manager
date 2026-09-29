@@ -58,11 +58,11 @@ $app->group('', function ($route) {
     $route->map(['GET', 'POST'], '/zone/create', ZonesController::class . ':createZone')->setName('createZone');
     $route->get('/zone/view/{zone}', ZonesController::class . ':viewZone')->setName('viewZone');
     $route->get('/zone/details/{zone}', ZonesController::class . ':zoneDetails')->setName('zoneDetails');
-    $route->get('/zone/dnssec/{zone}', ZonesController::class . ':zoneDNSSEC')->setName('zoneDNSSEC');
+    $route->post('/zone/dnssec/{zone}', ZonesController::class . ':zoneDNSSEC')->setName('zoneDNSSEC');
     $route->get('/zone/update/{zone}', ZonesController::class . ':updateZone')->setName('updateZone');
     $route->post('/zone/update', ZonesController::class . ':updateZoneProcess')->setName('updateZoneProcess');
     $route->post('/zone/updaterecord', ZonesController::class . ':zoneUpdateRecord')->setName('zoneUpdateRecord');
-    $route->map(['GET', 'POST'], '/zone/delete/{zone}', ZonesController::class . ':deleteZone')->setName('deleteZone');
+    $route->post('/zone/delete/{zone}', ZonesController::class . ':deleteZone')->setName('deleteZone');
 
     $route->get('/users', UsersController::class .':listUsers')->setName('listUsers');
     $route->map(['GET', 'POST'], '/user/create', UsersController::class . ':createUser')->setName('createUser');
