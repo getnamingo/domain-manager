@@ -9,7 +9,15 @@ If you have not installed the panel yet, please start with **[install.md](instal
 
 Namingo Domain Manager uses **Cardo DNS 1.1+**. Provider support and DNSSEC capabilities are maintained in the [Cardo DNS supported providers table](https://github.com/getnamingo/cardo-dns#supported-providers).
 
-All provider credentials are read from the application's **`.env`** file. A provider appears in **Zones → New Zone** when at least one credential/configuration value exists for its explicit provider prefix. Generic settings such as `DNS_NS1` are never mistaken for providers.
+All provider credentials are read from the application's **`.env`** file. A provider appears in **Zones → New Zone** only when its mandatory credentials are present. Generic settings such as `DNS_NS1` and optional provider settings do not activate a provider by themselves.
+
+Credential requirements for provider discovery are:
+
+- **ClouDNS:** both `DNS_CLOUDNS_AUTH_ID` and `DNS_CLOUDNS_AUTH_PASSWORD`
+- **Scaleway:** both `DNS_SCALEWAY_API_KEY` and `DNS_SCALEWAY_PROJECT_ID`
+- **All other currently supported providers:** a non-empty provider `API_KEY`
+
+Optional settings such as `DNS_ANYCASTDNS_SERVER_ID=0`, `DNS_GANDILIVEDNS_AUTH_SCHEME=Bearer`, Gandi `SHARING_ID`, or Scaleway `PARENT_DOMAIN` do not make a provider active unless the required credentials above are also configured.
 
 # 1. Cloud-Based DNS Providers
 
