@@ -31,7 +31,33 @@ $pdo = new PDO(
 );
 
 $pdo->exec('ALTER TABLE zones MODIFY domain_name VARCHAR(253)');
-$pdo->exec('ALTER TABLE users_webauthn MODIFY credential_id VARBINARY(1024) NOT NULL');
+$pdo->exec('ALTER TABLE users_webauthn MODIFY credential_id VARBINARY(1364) NOT NULL');
+
+$credentialDuplicate = $pdo->query(
+    "SELECT credential_id
+     FROM users_webauthn
+     GROUP BY credential_id
+     HAVING COUNT(*) > 1
+     LIMIT 1"
+)->fetchColumn();
+
+if ($credentialDuplicate !== false) {
+    throw new RuntimeException(
+        'Cannot add WebAuthn credential uniqueness because duplicate credentials exist.'
+    );
+}
+
+$credentialIndex = $pdo->prepare(
+    "SELECT COUNT(*)
+     FROM information_schema.statistics
+     WHERE table_schema = ?
+       AND table_name = 'users_webauthn'
+       AND index_name = 'credential_id'"
+);
+$credentialIndex->execute([$name]);
+if ((int)$credentialIndex->fetchColumn() === 0) {
+    $pdo->exec('ALTER TABLE users_webauthn ADD UNIQUE KEY credential_id (credential_id)');
+}
 
 $duplicate = $pdo->query(
     "SELECT domain_name
