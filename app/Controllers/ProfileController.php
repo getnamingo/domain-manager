@@ -54,7 +54,7 @@ class ProfileController extends Controller
         
         // 2FA Setup
         $tfa = new TwoFactorAuth(
-            issuer: "Foundry",
+            issuer: "Namingo Domain Manager",
             qrcodeprovider: new BaconQRCodeProvider(0, '#ffffff', '#000000', 'svg')
         );
         $secret = $tfa->createSecret(160, true);
